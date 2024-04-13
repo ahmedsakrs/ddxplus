@@ -542,46 +542,46 @@ def asd_classifier(agent, optimizer, train_ds, eval_ds, args):
         mlflow.log_metric("asd-train-perf-ag", avg_metric_ag, i)
         mlflow.log_metric("asd-train-loss-patho", avg_loss_patho, i)
         mlflow.log_metric("asd-train-perf-patho", avg_metric_patho, i)
-        if (eval_dl is not None) and (i % eval_epoch_interval == 0):
-            agent.train(False)
 
-            [
-                eva_loss_ag,
-                eva_metric_ag,
-                eva_loss_sym,
-                eva_metric_sym,
-                eva_loss_patho,
-                eva_metric_patho,
-            ] = eval_epoch(
-                i, agent, eval_dl, args
+        agent.train(False)
+
+        [
+            eva_loss_ag,
+            eva_metric_ag,
+            eva_loss_sym,
+            eva_metric_sym,
+            eva_loss_patho,
+            eva_metric_patho,
+        ] = eval_epoch(
+            i, agent, eval_dl, args
+        )
+        # avg_val_perf, il = eval_epoch(i, agent, eval_dl, args)
+        mlflow.log_metric("asd-val-loss-sym", eva_loss_sym, i)
+        mlflow.log_metric("asd-val-perf-sym", eva_metric_sym, i)
+        mlflow.log_metric("asd-val-loss-ag", eva_loss_ag, i)
+        mlflow.log_metric("asd-val-perf-ag", eva_metric_ag, i)
+        mlflow.log_metric("asd-val-loss-patho", eva_loss_patho, i)
+        mlflow.log_metric("asd-val-perf-patho", eva_metric_patho, i)
+
+        avg_val_perf = (eva_metric_ag + eva_metric_sym) / 2.0
+        # import pdb;pdb.set_trace()
+        mlflow.log_metric("asd-val-avg-perf", avg_val_perf, i)
+        if (best_performance is None) or (avg_val_perf > best_performance):
+            best_performance = avg_val_perf
+            # params = dict(
+            #     itr=i,
+            #     agent_state_dict=agent.state_dict(),
+            #     pretrain_optimizer_state_dict=optimizer.state_dict(),
+            # )
+            file_name = os.path.join(args.output, BEST_PRETRAIN_MODEL_NAME)
+            torch.save(agent.cpu().state_dict(), file_name)
+            remaining_patience = args.patience
+        else:
+            remaining_patience = (
+                remaining_patience - 1
+                if args.patience is not None
+                else args.patience
             )
-            # avg_val_perf, il = eval_epoch(i, agent, eval_dl, args)
-            mlflow.log_metric("asd-val-loss-sym", eva_loss_sym, i)
-            mlflow.log_metric("asd-val-perf-sym", eva_metric_sym, i)
-            mlflow.log_metric("asd-val-loss-ag", eva_loss_ag, i)
-            mlflow.log_metric("asd-val-perf-ag", eva_metric_ag, i)
-            mlflow.log_metric("asd-val-loss-patho", eva_loss_patho, i)
-            mlflow.log_metric("asd-val-perf-patho", eva_metric_patho, i)
-
-            avg_val_perf = (eva_metric_ag + eva_metric_sym) / 2.0
-            # import pdb;pdb.set_trace()
-            mlflow.log_metric("asd-val-avg-perf", avg_val_perf, i)
-            if (best_performance is None) or (avg_val_perf > best_performance):
-                best_performance = avg_val_perf
-                # params = dict(
-                #     itr=i,
-                #     agent_state_dict=agent.state_dict(),
-                #     pretrain_optimizer_state_dict=optimizer.state_dict(),
-                # )
-                file_name = os.path.join(args.output, BEST_PRETRAIN_MODEL_NAME)
-                torch.save(agent.cpu().state_dict(), file_name)
-                remaining_patience = args.patience
-            else:
-                remaining_patience = (
-                    remaining_patience - 1
-                    if args.patience is not None
-                    else args.patience
-                )
         print(
             f"ASD Epoch {i}: tr_loss_sym: {avg_loss_sym} tr_perf_sym: {avg_metric_sym}\n"
             f"tr_loss_ag: {avg_loss_ag} tr_perf_ag: {avg_metric_ag}\n"
