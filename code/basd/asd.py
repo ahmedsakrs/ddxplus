@@ -15,8 +15,8 @@ from dataset import ASDPatientInteractionSimulator, SimPaDatasetTrain as SimPaDa
 
 from orion.client import report_results
 
-
-BEST_PRETRAIN_MODEL_NAME = "asd_best_model_params.pkl"
+BEST_PRETRAIN_MODEL_NAME = "asd_best_model_params.pt"
+device = torch.device("cuda")
 
 
 def initialize_seed(seed):
@@ -37,6 +37,7 @@ def initialize_seed(seed):
         torch.cuda.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
 
 def softXEnt(input, target, dim=-1, reduction='mean', weight=None):
     """Adapted from this pytorch discussion link.
@@ -62,14 +63,14 @@ def softXEnt(input, target, dim=-1, reduction='mean', weight=None):
 
 
 def dist_accuracy(
-    pred,
-    target,
-    target_indices,
-    target_probas,
-    k,
-    restrict_to_k=False,
-    ignore_index=-1,
-    reduction='mean',
+        pred,
+        target,
+        target_indices,
+        target_probas,
+        k,
+        restrict_to_k=False,
+        ignore_index=-1,
+        reduction='mean',
 ):
     """Computes the fraction of the predicted topk classes in the target distribution.
 
@@ -142,7 +143,7 @@ def dist_accuracy(
     topk = topk.reshape((-1, kmin))
 
     assert (
-        topk.shape[0] == target_indices.shape[0]
+            topk.shape[0] == target_indices.shape[0]
     ), f"{topk.shape} - {target_indices.shape} - {k} - {pred.shape}"
 
     merge_arr = np.concatenate((topk, target_indices), axis=1)
@@ -261,9 +262,11 @@ def train_epoch(epoch, agent, optimizer, train_dl, args):
     avg_metric_patho = None
     num_elts_ag = 0
     num_elts_sym = 0
+    agent.to(device)
     agent.train(True)
     # assert train_dl.concatenate
-    for _, (x_ag, ag_gt, x_sym, sym_gt, is_diff, diff) in tqdm(enumerate(train_dl), total=len(train_dl), desc=f"epoch {epoch}: "):
+    for _, (x_ag, ag_gt, x_sym, sym_gt, is_diff, diff) in tqdm(enumerate(train_dl), total=len(train_dl),
+                                                               desc=f"epoch {epoch}: "):
         num_elts_ag += x_ag.shape[0]
         num_elts_sym += x_sym.shape[0]
         num_diff = is_diff.sum().item()
@@ -273,12 +276,12 @@ def train_epoch(epoch, agent, optimizer, train_dl, args):
         o_ind = np.ones(shape) * np.array(list(range(diff.shape[-1])))
 
         x_ag, ag_gt, x_sym, sym_gt, is_diff, diff = (
-            x_ag.float().to(args.device),
-            ag_gt.float().to(args.device),
-            x_sym.float().to(args.device),
-            sym_gt.long().to(args.device),
-            is_diff.float().to(args.device),
-            diff.float().to(args.device),
+            x_ag.float().to(device),
+            ag_gt.float().to(device),
+            x_sym.float().to(device),
+            sym_gt.long().to(device),
+            is_diff.float().to(device),
+            diff.float().to(device),
         )
         optimizer.zero_grad()
         # import pdb;pdb.set_trace()
@@ -295,8 +298,8 @@ def train_epoch(epoch, agent, optimizer, train_dl, args):
             0.0
             if patho_pred is None
             else (
-                softXEnt(patho_pred, diff, reduction='none') * is_diff.squeeze(1)
-            ).sum() / max(1, num_diff)
+                         softXEnt(patho_pred, diff, reduction='none') * is_diff.squeeze(1)
+                 ).sum() / max(1, num_diff)
         )
         loss = loss_ag + loss_sym + loss_patho
         loss.backward()
@@ -306,8 +309,8 @@ def train_epoch(epoch, agent, optimizer, train_dl, args):
         avg_loss_ag += loss_ag.item() * x_ag.shape[0]
         avg_loss_sym += loss_sym.item() * x_sym.shape[0]
         avg_loss_patho += (
-            loss_patho.item() if hasattr(loss_patho, 'item') else loss_patho
-        ) * x_ag.shape[0]
+                              loss_patho.item() if hasattr(loss_patho, 'item') else loss_patho
+                          ) * x_ag.shape[0]
         if args.metric is not None:
             avg_metric_ag = 0.0 if avg_metric_ag is None else avg_metric_ag
             avg_metric_sym = 0.0 if avg_metric_sym is None else avg_metric_sym
@@ -362,9 +365,7 @@ def eval_epoch(epoch, agent, eval_dl, args):
     agent: agent
         the agent whose classifier should be pretrained.
     eval_dl: dataloader
-        the validate dataloader.
-    metric_factory: object
-        the metric factory.
+        the validation dataloader.
     args: dict
         The arguments as provided in the command line.
 
@@ -378,6 +379,7 @@ def eval_epoch(epoch, agent, eval_dl, args):
     """
 
     with torch.no_grad():
+        agent.to(device)
         agent.train(False)
         avg_loss_sym = 0.0
         avg_loss_ag = 0.0
@@ -387,7 +389,8 @@ def eval_epoch(epoch, agent, eval_dl, args):
         avg_metric_patho = None
         num_elts_ag = 0
         num_elts_sym = 0
-        for _, (x_ag, ag_gt, x_sym, sym_gt, is_diff, diff) in tqdm(enumerate(eval_dl), total=len(eval_dl), desc=f"Eval epoch {epoch}: "):
+        for _, (x_ag, ag_gt, x_sym, sym_gt, is_diff, diff) in tqdm(enumerate(eval_dl), total=len(eval_dl),
+                                                                   desc=f"Eval epoch {epoch}: "):
             num_elts_ag += x_ag.shape[0]
             num_elts_sym += x_sym.shape[0]
             num_diff = is_diff.sum().item()
@@ -397,15 +400,20 @@ def eval_epoch(epoch, agent, eval_dl, args):
             o_ind = np.ones(shape) * np.array(list(range(diff.shape[-1])))
 
             x_ag, ag_gt, x_sym, sym_gt, is_diff, diff = (
-                x_ag.float().to(args.device),
-                ag_gt.float().to(args.device),
-                x_sym.float().to(args.device),
-                sym_gt.long().to(args.device),
-                is_diff.float().to(args.device),
-                diff.float().to(args.device),
+                x_ag.float().to(device),
+                ag_gt.float().to(device),
+                x_sym.float().to(device),
+                sym_gt.long().to(device),
+                is_diff.float().to(device),
+                diff.float().to(device),
             )
 
             sym_pred, ag_pred, patho_pred = agent(x_sym, x_ag)
+            print(sym_pred)
+            print(ag_pred)
+            print(patho_pred)
+            print()
+            print()
 
             # compute loss
             loss_ag = F.binary_cross_entropy_with_logits(
@@ -418,8 +426,8 @@ def eval_epoch(epoch, agent, eval_dl, args):
                 0.0
                 if patho_pred is None
                 else (
-                    softXEnt(patho_pred, diff, reduction='none') * is_diff.squeeze(1)
-                ).sum() / max(1, num_diff)
+                             softXEnt(patho_pred, diff, reduction='none') * is_diff.squeeze(1)
+                     ).sum() / max(1, num_diff)
             )
             loss = loss_ag + loss_sym + loss_patho
             _ = loss
@@ -427,8 +435,8 @@ def eval_epoch(epoch, agent, eval_dl, args):
             avg_loss_ag += loss_ag.item() * x_ag.shape[0]
             avg_loss_sym += loss_sym.item() * x_sym.shape[0]
             avg_loss_patho += (
-                loss_patho.item() if hasattr(loss_patho, 'item') else loss_patho
-            ) * x_ag.shape[0]
+                                  loss_patho.item() if hasattr(loss_patho, 'item') else loss_patho
+                              ) * x_ag.shape[0]
             if args.metric is not None:
                 avg_metric_ag = 0.0 if avg_metric_ag is None else avg_metric_ag
                 avg_metric_sym = 0.0 if avg_metric_sym is None else avg_metric_sym
@@ -479,49 +487,6 @@ def eval_epoch(epoch, agent, eval_dl, args):
     return avg_loss_ag, avg_metric_ag, avg_loss_sym, avg_metric_sym, avg_loss_patho, ov
 
 
-def eval_epoch2(epoch, agent, eval_dl, args):
-    """Train Epoch for the pretraining process.
-
-    Parameters
-    ----------
-    epoch: int
-        the epoch number.
-    agent: agent
-        the agent whose classifier should be pretrained.
-    eval_dl: dataloader
-        the validate dataloader.
-    metric_factory: object
-        the metric factory.
-    args: dict
-        The arguments as provided in the command line.
-
-    Return
-    ------
-    avg_loss: float
-        the obtained average loss value.
-    avg_metric: float
-        the obtained average performance metric value.
-
-    """
-
-    with torch.no_grad():
-        agent.train(False)
-        result = eval_dl.evaluate(
-            agent,
-            args.interaction_length,
-            args.num_valid_trajs,
-            None,
-            args.seed,
-            args.cuda_idx,
-            args.thres,
-            args.masked_inquired_actions,
-            args.compute_metrics_flag,
-            args.eval_batch_size,
-        )
-    # import pdb;pdb.set_trace()
-    return result["average_evidence_recall"], result["average_step"]
-
-
 def asd_classifier(agent, optimizer, train_ds, eval_ds, args):
     """Pretrain the agent classifier.
 
@@ -533,8 +498,8 @@ def asd_classifier(agent, optimizer, train_ds, eval_ds, args):
         the optimizer to be used.
     train_ds: dataset
         the training dataset.
-    valid_ds: dataset
-        the valid dataset.
+    eval_ds: dataset
+        the validation dataset.
     args: dict
         the arguments as provided in the command line.
 
@@ -603,13 +568,13 @@ def asd_classifier(agent, optimizer, train_ds, eval_ds, args):
             mlflow.log_metric("asd-val-avg-perf", avg_val_perf, i)
             if (best_performance is None) or (avg_val_perf > best_performance):
                 best_performance = avg_val_perf
-                params = dict(
-                    itr=i,
-                    agent_state_dict=agent.state_dict(),
-                    pretrain_optimizer_state_dict=optimizer.state_dict(),
-                )
+                # params = dict(
+                #     itr=i,
+                #     agent_state_dict=agent.state_dict(),
+                #     pretrain_optimizer_state_dict=optimizer.state_dict(),
+                # )
                 file_name = os.path.join(args.output, BEST_PRETRAIN_MODEL_NAME)
-                torch.save(params, file_name)
+                torch.save(agent.cpu().state_dict(), file_name)
                 remaining_patience = args.patience
             else:
                 remaining_patience = (
@@ -618,32 +583,23 @@ def asd_classifier(agent, optimizer, train_ds, eval_ds, args):
                     else args.patience
                 )
         print(
-            f"ASD Epoch {i}: tr_loss_sym: {avg_loss_sym} tr_perf_sym: {avg_metric_sym} "
-            f"tr_loss_ag: {avg_loss_ag} tr_perf_ag: {avg_metric_ag} "
-            f"tr_loss_patho: {avg_loss_patho} tr_perf_patho: {avg_metric_patho} "
-            f"va_loss_sym: {eva_loss_sym} va_perf_sym: {eva_metric_sym} "
-            f"va_loss_ag: {eva_loss_ag} va_perf_ag: {eva_metric_ag} "
-            f"va_loss_patho: {eva_loss_patho} va_perf_patho: {eva_metric_patho} "
+            f"ASD Epoch {i}: tr_loss_sym: {avg_loss_sym} tr_perf_sym: {avg_metric_sym}\n"
+            f"tr_loss_ag: {avg_loss_ag} tr_perf_ag: {avg_metric_ag}\n"
+            f"tr_loss_patho: {avg_loss_patho} tr_perf_patho: {avg_metric_patho}\n"
+            f"va_loss_sym: {eva_loss_sym} va_perf_sym: {eva_metric_sym}\n"
+            f"va_loss_ag: {eva_loss_ag} va_perf_ag: {eva_metric_ag}\n"
+            f"va_loss_patho: {eva_loss_patho} va_perf_patho: {eva_metric_patho}\n"
             f"valid_perf: {avg_val_perf}."
         )
         if (remaining_patience is not None) and (remaining_patience < 0):
             break
-    if best_performance is None:
-        params = dict(
-            itr=i,
-            agent_state_dict=agent.state_dict(),
-            pretrain_optimizer_state_dict=optimizer.state_dict(),
-        )
-        file_name = os.path.join(args.output, BEST_PRETRAIN_MODEL_NAME)
-        torch.save(params, file_name)
-    else:
-        func_metric = "loss" if not args.metric else args.metric
-        print(
-            f"End Pretraining Epoch with best recall performance of ({func_metric}): "
-            f"{best_performance}."
-        )
-        value = float(best_performance) if func_metric == "loss" else -float(best_performance)
-        report_results([dict(name="dev_metric", type="objective", value=value)])
+    func_metric = "loss" if not args.metric else args.metric
+    print(
+        f"End Pretraining Epoch with best recall performance of ({func_metric}): "
+        f"{best_performance}."
+    )
+    value = float(best_performance) if func_metric == "loss" else -float(best_performance)
+    report_results([dict(name="dev_metric", type="objective", value=value)])
     # import pdb;pdb.set_trace()
 
 
@@ -684,7 +640,7 @@ def asd_train(args, params=None):
         params = {}
 
     assert (args.valid_percentage is None) or (
-        (args.valid_percentage >= 0) and (args.valid_percentage < 1)
+            (args.valid_percentage >= 0) and (args.valid_percentage < 1)
     )
     assert args.batch_size > 0
     assert args.patience >= 0
@@ -709,17 +665,15 @@ def asd_train(args, params=None):
     args.symptom_prediction_size = env_train.symptom_size
     args.action_state_size = 1
     args.patho_size = env_train.diag_size if args.patho_size is None else args.patho_size
-    
 
     # instantiate the agent
     args.device = torch.device(
-        f"cuda:{args.cuda_idx}"
-        if torch.cuda.is_available() and args.cuda_idx is not None
+        f"cuda"
+        if torch.cuda.is_available()
         else "cpu"
     )
     agent = create_agent(args)
-    if args.cuda_idx is not None and torch.cuda.is_available():
-        agent.to(args.device)
+    agent.to(args.device)
 
     # get the optimizer info
     optimCls, optim_params = optim.Adam, {}
@@ -727,8 +681,7 @@ def asd_train(args, params=None):
     # create the datasets
     ds_train, ds_valid = create_datasets(env_train, env_valid, args)
     # print()
-    optimizer = optimCls(agent.parameters(), lr=args.lr, **optim_params,)
-    
+    optimizer = optimCls(agent.parameters(), lr=args.lr, **optim_params, )
+
     # train
     asd_classifier(agent, optimizer, ds_train, ds_valid, args)
-

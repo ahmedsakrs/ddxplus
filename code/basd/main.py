@@ -12,7 +12,7 @@ from inference import asd_test
 
 
 def main():
-    """This is an utility function for pretraining MixedDQN like agents.
+    """This is a utility function for pretraining MixedDQN like agents.
 
     Here, the objective is to pretrain the classifier branch of such an agent
     in a supervised way with the hope to significantly reduce the training time in
@@ -108,7 +108,7 @@ def main():
         type=str,
         default="",
     )
-    parser.add_argument("--cuda_idx", help="gpu to use", type=int, default=None)
+    parser.add_argument("--cuda_idx", help="gpu to use", type=int, default=0)
     parser.add_argument("--seed", help="seed to be used", type=int, default=None)
     parser.add_argument('--exp_name', type=str, default='ASD', help='Experience Name')
     parser.add_argument(
