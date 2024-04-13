@@ -21,7 +21,7 @@ NONE_VAL = 0
 # presence value - indicating a symptom is present
 PRES_VAL = 1
 # absence value - indicating a symptom is absent
-ABS_VAL = -1    
+ABS_VAL = -1
 
 
 class environment(object):
@@ -32,10 +32,10 @@ class environment(object):
     """
 
     def __init__(
-        self,
-        args,
-        patient_filepath,
-        train=None,
+            self,
+            args,
+            patient_filepath,
+            train=None,
     ):
         """Init method of the simulator.
 
@@ -145,11 +145,11 @@ class environment(object):
         self.turns = 0
 
         self.context_size = (
-            self.num_age_values
-            + self.num_sex_values
-            + self.num_race_values
-            + self.num_ethnic_values
-            + (1 if self.include_turns_in_state else 0)
+                self.num_age_values
+                + self.num_sex_values
+                + self.num_race_values
+                + self.num_ethnic_values
+                + (1 if self.include_turns_in_state else 0)
         )
         self.sample_size = len(rb)
         self.idx = 0
@@ -175,17 +175,16 @@ class environment(object):
         self.severity_mask = np.zeros((self.num_pathos,))
         severity_threshold = 3
         for patho_index in range(self.num_pathos):
-            if self.pathology_data[self.pathology_index_2_key[patho_index]].get("urgence", severity_threshold) < severity_threshold:
+            if self.pathology_data[self.pathology_index_2_key[patho_index]].get("urgence",
+                                                                                severity_threshold) < severity_threshold:
                 self.severity_mask[patho_index] = 1
         self._put_patients_data_in_cache(rb)
-
 
     def reset(self):
         self.idx = 0
         self.turns = 0
         if self.train:
             np.random.shuffle(self.indexes)
-        
 
     def _convert_to_aarlc_format(self, rb_data):
         age = rb_data["AGE_BEGIN"]
@@ -213,7 +212,7 @@ class environment(object):
                 ]
                 for diff_data in rb_data["DIFFERNTIAL_DIAGNOSIS"]
                 if self.unique_differential_pathos[int(diff_data[0])]
-                in self.pathology_name_2_index
+                   in self.pathology_name_2_index
             }
         )
         out_diff = self._compute_differential_probs(differential_data)
@@ -223,10 +222,12 @@ class environment(object):
             target_state[0] = 0
         target_state = self._init_demo_features(target_state, age, sex, race, ethnic)
         binary_symptoms, present_evidences, target_state = self.parse_target_patients(
-                symptoms, target_state
+            symptoms, target_state
         )
-        present_symptoms = [a for a in present_evidences if not self.symptom_data[self.symptom_index_2_key[a]].get("is_antecedent", False)]
-        present_atcds = [a for a in present_evidences if self.symptom_data[self.symptom_index_2_key[a]].get("is_antecedent", False)]
+        present_symptoms = [a for a in present_evidences if
+                            not self.symptom_data[self.symptom_index_2_key[a]].get("is_antecedent", False)]
+        present_atcds = [a for a in present_evidences if
+                         self.symptom_data[self.symptom_index_2_key[a]].get("is_antecedent", False)]
         result = {}
         result['bin_sym'] = binary_symptoms
         result['pres_evi'] = present_evidences
@@ -243,17 +244,16 @@ class environment(object):
         result['differential_indices'] = differential_indices
         result['differential_probas'] = differential_probas
         return result
-        
 
     def _put_patients_data_in_cache(self, rb):
         patients = rb.apply(lambda row_data: self._convert_to_aarlc_format(row_data), axis="columns").to_list()
         self.cached_patients = {idx: patient_data for idx, patient_data in enumerate(patients)}
 
-
     def parse_target_patients(self, symptomPat, target_state):
         binary_symptoms = []
         present_symptoms = []
-        symptoms_not_listed = set(self.all_symptom_names) - set([self.get_symptom_and_value(symptom_name)[0] for symptom_name in symptomPat])
+        symptoms_not_listed = set(self.all_symptom_names) - set(
+            [self.get_symptom_and_value(symptom_name)[0] for symptom_name in symptomPat])
         considered_symptoms = set(symptomPat + list(symptoms_not_listed))
         for symptom_name in considered_symptoms:
             root_sympt_name, symp_val = self.get_symptom_and_value(symptom_name)
@@ -301,13 +301,12 @@ class environment(object):
         present_symptoms = list(set(present_symptoms))
         return binary_symptoms, present_symptoms, target_state
 
-
     def initialize_state(self, batch_size=None, indices=None):
         assert (batch_size is None) or (indices is None)
         assert not (batch_size is None and indices is None)
         if (batch_size is not None):
             self.batch_size = batch_size
-            self.batch_index = self.indexes[self.idx : self.idx+batch_size]
+            self.batch_index = self.indexes[self.idx: self.idx + batch_size]
             self.idx += batch_size
         if indices is not None:
             self.batch_size = len(indices)
@@ -320,7 +319,7 @@ class environment(object):
         self.disease_severity = []
         self.pos_sym = []
         self.acquired_sym = []
-        
+
         i = 0
         init_state = np.ones((self.batch_size, self.state_size), dtype=self.obs_dtype) * NONE_VAL
         self.target_state = np.ones((self.batch_size, self.state_size), dtype=self.obs_dtype) * ABS_VAL
@@ -373,10 +372,11 @@ class environment(object):
             self.all_state[i, present_evidences] = 1
             self.inquired_symptoms[i, index_first_symptom] = 1
             if (differential_indices is not None) and (differential_probas is not None):
-                self.target_differential[i, differential_indices[differential_indices != -1]] = differential_probas[differential_indices != -1]
+                self.target_differential[i, differential_indices[differential_indices != -1]] = differential_probas[
+                    differential_indices != -1]
             else:
                 self.target_differential[i, pathology_index] = 1.0
-            
+
             i += 1
 
         self.disease = np.array(self.disease)
@@ -390,25 +390,25 @@ class environment(object):
 
         return init_state, self.disease, self.differential_indices, self.differential_probas, self.disease_severity
 
-
     def step(self, s, a_p, done):
 
         s_ = copy.deepcopy(s)
-        s_[~done] = (1 - self.action_mask[a_p[~done]]) * s_[~done] + self.action_mask[a_p[~done]] * self.target_state[~done]
+        s_[~done] = (1 - self.action_mask[a_p[~done]]) * s_[~done] + self.action_mask[a_p[~done]] * self.target_state[
+            ~done]
         self.turns += 1
         if self.include_turns_in_state:
             # normalize number of turns
             s_[~done, 0] = self.turns / self.max_turns
 
-        reward_s = self.reward_func(s[:,self.context_size:], s_[:,self.context_size:], a_p)
+        reward_s = self.reward_func(s[:, self.context_size:], s_[:, self.context_size:], a_p)
         reward_s[done] = 0
 
         self.inquired_symptoms[~done, a_p[~done]] = 1
-        
+
         return s_, reward_s, done
-    
+
     def reward_func(self, s, s_, a_p):
-        
+
         reward = -self.cost[a_p]
         already_inquired_action = self.inquired_symptoms[range(self.inquired_symptoms.shape[0]), a_p]
         unrepeated_action = (1 - already_inquired_action)
@@ -419,19 +419,18 @@ class environment(object):
 
         return reward
 
-
     def _define_action_and_observation_spaces(
-        self,
-        num_symptoms,
-        num_pathos,
-        num_demo_features,
-        low_demo_values,
-        high_demo_values,
-        obs_dtype,
+            self,
+            num_symptoms,
+            num_pathos,
+            num_demo_features,
+            low_demo_values,
+            high_demo_values,
+            obs_dtype,
     ):
         """ Utility function for defining the enviroment action and observation spaces.
 
-        It define the action and observation spaces for this Gym environment.
+        It defines the action and observation spaces for this Gym environment.
 
         Parameters
         ----------
@@ -687,13 +686,13 @@ class environment(object):
         return result
 
     def _load_and_check_symptoms_with_pathos(
-        self,
-        symptom_filepath,
-        unique_symptoms,
-        symptoms_with_multiple_answers,
-        condition_filepath,
-        unique_pathos,
-        patho_symptoms,
+            self,
+            symptom_filepath,
+            unique_symptoms,
+            symptoms_with_multiple_answers,
+            condition_filepath,
+            unique_pathos,
+            patho_symptoms,
     ):
         """Check symptom/condition JSON file validity against the provided patient file.
 
@@ -835,7 +834,7 @@ class environment(object):
             return symptom_name, None
         else:
             elem_base = symptom_name[:idx]
-            elem_val = symptom_name[idx + 3 :]
+            elem_val = symptom_name[idx + 3:]
             base_idx = self.symptom_name_2_index.get(elem_base, -1)
 
             assert base_idx != -1, (
@@ -856,7 +855,7 @@ class environment(object):
 
         Parameters
         ----------
-        frame: np.array
+        frame: np.ndarray
             the observation frame to be updated.
         age: int
             the age of the patient.
@@ -925,7 +924,7 @@ class environment(object):
             if sumProba != 0:
                 probability = probability / sumProba
             else:
-                probability[0 : len(differential)] = 1.0 / len(differential)
+                probability[0: len(differential)] = 1.0 / len(differential)
 
         # sort in desceding order according to proba
         s_ind = np.argsort(probability, axis=-1)
@@ -1032,12 +1031,14 @@ class environment(object):
 
         return start_idx, end_idx
 
+
 if __name__ == '__main__':
     class AttrDict(dict):
         def __init__(self, *args, **kwargs):
             super(AttrDict, self).__init__(*args, **kwargs)
             self.__dict__ = self
-    
+
+
     args = AttrDict({
         'no_initial_evidence': False,
         'interaction_length': 30,

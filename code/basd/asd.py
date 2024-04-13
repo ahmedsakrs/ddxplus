@@ -409,11 +409,6 @@ def eval_epoch(epoch, agent, eval_dl, args):
             )
 
             sym_pred, ag_pred, patho_pred = agent(x_sym, x_ag)
-            print(sym_pred)
-            print(ag_pred)
-            print(patho_pred)
-            print()
-            print()
 
             # compute loss
             loss_ag = F.binary_cross_entropy_with_logits(
